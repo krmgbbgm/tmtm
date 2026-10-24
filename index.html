@@ -1,0 +1,1310 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>المحاكاة التعليمية للدوائر الكهربائية البسيطة</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Arabic (Cairo) -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <!-- Three.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Three.js OrbitControls -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <style>
+        * {
+            font-family: 'Cairo', sans-serif;
+            user-select: none;
+        }
+        body {
+            background-color: #0b0f19;
+            color: #f1f5f9;
+            overflow-x: hidden;
+        }
+        canvas {
+            display: block;
+            outline: none;
+        }
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(51, 65, 85, 0.8);
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: rgba(71, 85, 105, 1);
+        }
+        .pulse-light {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .5; }
+        }
+        .btn-action {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .btn-action:hover {
+            transform: translateY(-2px);
+        }
+        .btn-action:active {
+            transform: translateY(0);
+        }
+        .terminal-hover {
+            cursor: pointer;
+            filter: drop-shadow(0 0 8px #38bdf8);
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col overflow-hidden bg-slate-950">
+
+    <!-- Navigation Header -->
+    <header class="h-16 glass-panel border-b border-slate-800 px-6 flex items-center justify-between z-20 shrink-0">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 font-bold text-xl">
+                <i class="fa-solid fa-bolt"></i>
+            </div>
+            <div>
+                <h1 class="text-lg font-bold bg-gradient-to-r from-amber-300 via-amber-400 to-yellow-500 bg-clip-text text-transparent">
+                    مختبر الكهرباء التفاعلي
+                </h1>
+                <p class="text-xs text-slate-400">رحلة اكتشاف واستكشاف الدوائر الكهربائية البسيطة</p>
+            </div>
+        </div>
+
+        <!-- Stage Navigation Tabs -->
+        <div class="flex items-center gap-2 bg-slate-900/80 p-1.5 rounded-2xl border border-slate-800">
+            <button id="btn-stage-1" onclick="app.requestStageSwitch(1)" class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20">
+                <span class="w-5 h-5 rounded-full bg-slate-950/20 flex items-center justify-center text-[10px]">1</span>
+                المرحلة 1: اتعلّم
+            </button>
+            <button id="btn-stage-2" onclick="app.requestStageSwitch(2)" class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-white hover:bg-slate-800/50">
+                <span class="w-5 h-5 rounded-full bg-slate-800 flex items-center justify-center text-[10px]">2</span>
+                المرحلة 2: اصنع بنفسك
+            </button>
+            <button id="btn-stage-3" onclick="app.requestStageSwitch(3)" class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-white hover:bg-slate-800/50">
+                <span class="w-5 h-5 rounded-full bg-slate-800 flex items-center justify-center text-[10px]">3</span>
+                المرحلة 3: تحدي الإصلاح
+            </button>
+        </div>
+
+        <!-- User Progress & Score -->
+        <div class="flex items-center gap-4">
+            <div class="flex items-center gap-2 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800">
+                <i class="fa-solid fa-star text-amber-400 text-sm"></i>
+                <span class="text-xs text-slate-400">النقاط:</span>
+                <span id="score-display" class="font-bold text-amber-400 text-sm font-mono">0</span>
+            </div>
+            <button onclick="app.resetLabBoard()" title="مسح اللوحة وإعادة التشغيل" class="w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 hover:text-amber-400 hover:border-amber-500/40 transition">
+                <i class="fa-solid fa-rotate-right"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 flex relative overflow-hidden">
+        
+        <!-- Sidebar Controls / Knowledge Base -->
+        <aside id="sidebar" class="w-96 glass-panel border-l border-slate-800 flex flex-col z-10 shrink-0 custom-scrollbar overflow-y-auto">
+            
+            <!-- Stage 1 Panel -->
+            <div id="panel-stage-1" class="flex-1 flex flex-col p-4">
+                <h2 class="text-base font-bold text-amber-400 mb-2 flex items-center gap-2">
+                    <i class="fa-solid fa-book-open"></i> موسوعة المكونات الكهربائية
+                </h2>
+                <p class="text-xs text-slate-400 mb-4">انقر على أي مكون في الأسفل لاستكشاف مجسمه وتدريبه ووظيفته في الدائرة:</p>
+
+                <!-- Components Selector Grid -->
+                <div class="grid grid-cols-2 gap-2 mb-4">
+                    <button onclick="app.selectLearnComponent('battery')" class="p-2.5 bg-slate-900 border border-slate-800 rounded-xl hover:border-amber-500/50 flex flex-col items-center gap-1.5 transition text-center group">
+                        <i class="fa-solid fa-car-battery text-amber-400 text-lg group-hover:scale-110 transition"></i>
+                        <span class="text-xs font-bold text-slate-200">بطارية</span>
+                    </button>
+                    <button onclick="app.selectLearnComponent('bulb')" class="p-2.5 bg-slate-900 border border-slate-800 rounded-xl hover:border-amber-500/50 flex flex-col items-center gap-1.5 transition text-center group">
+                        <i class="fa-regular fa-lightbulb text-amber-400 text-lg group-hover:scale-110 transition"></i>
+                        <span class="text-xs font-bold text-slate-200">مصباح</span>
+                    </button>
+                    <button onclick="app.selectLearnComponent('switch')" class="p-2.5 bg-slate-900 border border-slate-800 rounded-xl hover:border-amber-500/50 flex flex-col items-center gap-1.5 transition text-center group">
+                        <i class="fa-solid fa-toggle-on text-amber-400 text-lg group-hover:scale-110 transition"></i>
+                        <span class="text-xs font-bold text-slate-200">مفتاح</span>
+                    </button>
+                    <button onclick="app.selectLearnComponent('wire')" class="p-2.5 bg-slate-900 border border-slate-800 rounded-xl hover:border-amber-500/50 flex flex-col items-center gap-1.5 transition text-center group">
+                        <i class="fa-solid fa-grip-lines text-amber-400 text-lg group-hover:scale-110 transition"></i>
+                        <span class="text-xs font-bold text-slate-200">سلك توصيل</span>
+                    </button>
+                    <button onclick="app.selectLearnComponent('motor')" class="p-2.5 bg-slate-900 border border-slate-800 rounded-xl hover:border-amber-500/50 flex flex-col items-center gap-1.5 transition text-center group">
+                        <i class="fa-solid fa-fan text-amber-400 text-lg group-hover:scale-110 transition"></i>
+                        <span class="text-xs font-bold text-slate-200">محرك صغير</span>
+                    </button>
+                    <button onclick="app.selectLearnComponent('buzzer')" class="p-2.5 bg-slate-900 border border-slate-800 rounded-xl hover:border-amber-500/50 flex flex-col items-center gap-1.5 transition text-center group">
+                        <i class="fa-solid fa-bullhorn text-amber-400 text-lg group-hover:scale-110 transition"></i>
+                        <span class="text-xs font-bold text-slate-200">جرس</span>
+                    </button>
+                </div>
+
+                <!-- Info Card for Selected Component -->
+                <div id="component-info-card" class="bg-slate-900/90 rounded-2xl p-4 border border-slate-800 mb-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 id="info-comp-name" class="font-bold text-sm text-amber-400">بطارية (مصدر الكهرباء)</h3>
+                        <span id="info-comp-symbol" class="text-xs px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 font-mono border border-amber-500/20">DC Battery</span>
+                    </div>
+                    <p id="info-comp-desc" class="text-xs text-slate-300 leading-relaxed mb-3">
+                        تزود الدائرة بالكهرباء والقدرة اللازمة لتحريك التيار وتشغيل المكونات.
+                    </p>
+                    <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-[11px] text-slate-400 space-y-1">
+                        <div class="flex justify-between">
+                            <span>وظيفة المكوّن:</span>
+                            <span id="info-comp-physics" class="font-bold text-slate-200">تزويد الدائرة بالكهرباء</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stage 1 Interactive Full Circuit Demo Button -->
+                <div class="mb-4">
+                    <button onclick="app.showFullCircuitDemo()" class="btn-action w-full py-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-play text-emerald-400"></i>
+                        <span>عرض دائرة كهربائية مكتملة</span>
+                    </button>
+                </div>
+
+                <!-- Quiz Prompt Stage 1 -->
+                <div class="mt-auto bg-gradient-to-b from-slate-900 to-amber-950/20 p-4 rounded-2xl border border-amber-500/20">
+                    <h3 class="text-xs font-bold text-amber-400 mb-1 flex items-center gap-1.5">
+                        <i class="fa-solid fa-circle-question"></i> اختبر معلوماتك الآن!
+                    </h3>
+                    <p class="text-[11px] text-slate-400 mb-3">أجب عن الأسئلة لتفتح لك مرحلة التجميع والابتكار.</p>
+                    <button onclick="app.startStage1Quiz()" class="btn-action w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20">
+                        <span>بدء الاختبار القصير</span>
+                        <i class="fa-solid fa-arrow-left"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Stage 2 Panel -->
+            <div id="panel-stage-2" class="flex-1 flex flex-col p-4 hidden">
+                <h2 class="text-base font-bold text-amber-400 mb-1 flex items-center gap-2">
+                    <i class="fa-solid fa-screwdriver-wrench"></i> لوحة الأدوات والتصميم
+                </h2>
+                <p class="text-xs text-slate-400 mb-3">انقر لإضافة الأدوات على الطاولة، ثم انقر على أطراف المكونات (النقاط الملونة) لربط الأسلاك بينها:</p>
+
+                <!-- Tools Palette -->
+                <div class="grid grid-cols-2 gap-2 mb-4">
+                    <button onclick="app.addLabComponent('battery')" class="btn-action p-2.5 bg-slate-900 border border-slate-800 hover:border-amber-500 rounded-xl text-right flex items-center gap-2.5">
+                        <i class="fa-solid fa-car-battery text-amber-400 text-base"></i>
+                        <div>
+                            <div class="text-xs font-bold text-slate-200">إضافة بطارية</div>
+                            <div class="text-[10px] text-slate-500">بها طرفان (+ و -)</div>
+                        </div>
+                    </button>
+                    <button onclick="app.addLabComponent('bulb')" class="btn-action p-2.5 bg-slate-900 border border-slate-800 hover:border-amber-500 rounded-xl text-right flex items-center gap-2.5">
+                        <i class="fa-regular fa-lightbulb text-amber-400 text-base"></i>
+                        <div>
+                            <div class="text-xs font-bold text-slate-200">إضافة مصباح</div>
+                            <div class="text-[10px] text-slate-500">به طرفا توصيل</div>
+                        </div>
+                    </button>
+                    <button onclick="app.addLabComponent('switch')" class="btn-action p-2.5 bg-slate-900 border border-slate-800 hover:border-amber-500 rounded-xl text-right flex items-center gap-2.5">
+                        <i class="fa-solid fa-toggle-on text-amber-400 text-base"></i>
+                        <div>
+                            <div class="text-xs font-bold text-slate-200">إضافة مفتاح</div>
+                            <div class="text-[10px] text-slate-500">تحكم بالتشغيل</div>
+                        </div>
+                    </button>
+                    <button onclick="app.addLabComponent('wire')" class="btn-action p-2.5 bg-slate-900 border border-slate-800 hover:border-amber-500 rounded-xl text-right flex items-center gap-2.5">
+                        <i class="fa-solid fa-grip-lines text-amber-400 text-base"></i>
+                        <div>
+                            <div class="text-xs font-bold text-slate-200">إضافة سلك</div>
+                            <div class="text-[10px] text-slate-500">نقطتان للتوصيل</div>
+                        </div>
+                    </button>
+                    <button onclick="app.addLabComponent('motor')" class="btn-action p-2.5 bg-slate-900 border border-slate-800 hover:border-amber-500 rounded-xl text-right flex items-center gap-2.5">
+                        <i class="fa-solid fa-fan text-amber-400 text-base"></i>
+                        <div>
+                            <div class="text-xs font-bold text-slate-200">إضافة محرك</div>
+                            <div class="text-[10px] text-slate-500">يدور بالكهرباء</div>
+                        </div>
+                    </button>
+                    <button onclick="app.addLabComponent('buzzer')" class="btn-action p-2.5 bg-slate-900 border border-slate-800 hover:border-amber-500 rounded-xl text-right flex items-center gap-2.5">
+                        <i class="fa-solid fa-bullhorn text-amber-400 text-base"></i>
+                        <div>
+                            <div class="text-xs font-bold text-slate-200">إضافة جرس</div>
+                            <div class="text-[10px] text-slate-500">يصدر صوتاً</div>
+                        </div>
+                    </button>
+                </div>
+
+                <!-- Clear Board Button -->
+                <div class="mb-4">
+                    <button onclick="app.resetLabBoard()" class="w-full py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-trash-can"></i>
+                        <span>مسح لوحة العمل وإعادة البدء</span>
+                    </button>
+                </div>
+
+                <!-- Lab Tasks Progress -->
+                <div class="bg-slate-900/90 rounded-2xl p-3 border border-slate-800 mb-3">
+                    <h3 class="text-xs font-bold text-amber-400 mb-2 flex items-center gap-1.5">
+                        <i class="fa-solid fa-list-check"></i> طريقة التوصيل الصحيحة:
+                    </h3>
+                    <div id="tasks-list" class="space-y-2 text-xs">
+                        <div id="task-1" class="flex items-start gap-2 p-2 bg-slate-950 rounded-xl border border-slate-800">
+                            <i class="fa-solid fa-hand-pointer text-amber-400 mt-0.5 animate-bounce"></i>
+                            <div>
+                                <div class="font-bold text-slate-300">خطوات التوصيل:</div>
+                                <div class="text-[10px] text-slate-400">1. اضغط على نقطة طرف البطارية (النقطة الحمراء أو الزرقاء).<br>2. اضغط على نقطة طرف المصباح أو السلك لربط السلك بين الطرفين مباشرة.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="mt-auto space-y-2">
+                    <button onclick="app.checkLabCircuit()" class="btn-action w-full py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20">
+                        <i class="fa-solid fa-play"></i>
+                        <span>فحص واختبار الدائرة الكهربائية</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Stage 3 Panel -->
+            <div id="panel-stage-3" class="flex-1 flex flex-col p-4 hidden">
+                <h2 class="text-base font-bold text-amber-400 mb-2 flex items-center gap-2">
+                    <i class="fa-solid fa-user-ninja"></i> تحدي تشخيص أخطاء الدوائر
+                </h2>
+                <p class="text-xs text-slate-400 mb-3">صمّم طالب افتراضي دائرة بها خطأ. اكتشف المشكلة واكتب إجابتك وأصلح الدائرة!</p>
+
+                <div class="bg-slate-900 rounded-2xl p-3 border border-slate-800 mb-3">
+                    <div class="flex items-center gap-2 text-amber-400 font-bold text-xs mb-1">
+                        <i class="fa-solid fa-triangle-exclamation"></i> المشكلة الحالية:
+                    </div>
+                    <div id="stage3-puzzle-title" class="text-xs font-bold text-slate-200 mb-1">المصباح لا يضيء بالرغم من توصيل الأسلاك والمفتاح!</div>
+                    <div id="stage3-puzzle-desc" class="text-xs text-slate-400 leading-relaxed bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+                        قام التلميذ أحمد بتوصيل مصباح ومفتاح كهربائي باستخدام الأسلاك بشكل متصل، ولكن المصباح لا يضيء أبداً! افحص عناصر الدائرة على الطاولة واكتشف المكون الأساسي المفقود.
+                    </div>
+                </div>
+
+                <!-- Student Written Response Section -->
+                <div class="bg-slate-900 rounded-2xl p-3 border border-slate-800 mb-3">
+                    <label for="student-answer-input" class="block text-xs font-bold text-amber-300 mb-1 flex items-center gap-1.5">
+                        <i class="fa-solid fa-pen-to-square"></i> اكتب سبب المشكلة وكيف تصلحها:
+                    </label>
+                    <textarea id="student-answer-input" rows="2" placeholder="اكتب إجابتك هنا (مثال: عدم وجود بطارية كمصدر للطاقة)..." class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none focus:border-amber-400 resize-none transition"></textarea>
+                </div>
+
+                <div class="bg-slate-900/60 rounded-2xl p-3 border border-slate-800 mb-3">
+                    <button onclick="app.getHint()" class="text-xs font-bold text-cyan-400 flex items-center justify-between w-full">
+                        <span><i class="fa-regular fa-lightbulb text-amber-300 ml-1"></i> طلب تلميح مساعدة</span>
+                        <span class="text-[10px] text-slate-500 font-mono">(-5 نقاط)</span>
+                    </button>
+                    <div id="hint-display" class="text-xs text-cyan-200 mt-2 hidden bg-cyan-950/40 p-2 rounded-lg border border-cyan-800/50">
+                        تأمل المكونات الموجودة على الطاولة: هناك مصباح ومفتاح وأسلاك توصيل، لكن أين المصدر الذي يزود الدائرة بالطاقة والكهرباء؟
+                    </div>
+                </div>
+
+                <div class="mt-auto space-y-2">
+                    <button onclick="app.checkStage3Solution()" class="btn-action w-full py-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/20">
+                        <i class="fa-solid fa-paper-plane"></i> إرسال الإجابة وإصلاح الدائرة
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 3D Canvas Viewport Area -->
+        <div id="canvas-container" class="flex-1 relative bg-slate-950 overflow-hidden">
+            
+            <!-- Realtime Status Overlay -->
+            <div id="stats-overlay" class="absolute top-4 right-4 z-10 glass-panel p-3 rounded-2xl flex items-center gap-6 text-xs shadow-xl border border-slate-800">
+                <div class="flex items-center gap-2">
+                    <span id="status-indicator" class="w-2.5 h-2.5 rounded-full bg-slate-500"></span>
+                    <span class="text-slate-400">حالة الدائرة:</span>
+                    <span id="status-text" class="font-bold text-slate-400">مفتوحة - لا توجد عناصر</span>
+                </div>
+                <div class="h-4 w-px bg-slate-700"></div>
+                <div>
+                    <span class="text-slate-400">قوة البطارية:</span>
+                    <span id="voltage-text" class="font-bold text-amber-400 font-mono">لا توجد بطارية</span>
+                </div>
+                <div class="h-4 w-px bg-slate-700"></div>
+                <div>
+                    <span class="text-slate-400">سرعة الكهرباء:</span>
+                    <span id="current-text" class="font-bold text-cyan-400 font-mono">متوقفة (0)</span>
+                </div>
+            </div>
+
+            <!-- View Controls -->
+        <div class="absolute bottom-4 right-4 z-10 flex items-center gap-2">
+            <div id="wire-connecting-badge" class="hidden px-3 py-1.5 glass-panel text-cyan-400 border border-cyan-500/40 rounded-xl text-xs font-bold animate-pulse flex items-center gap-2">
+                <i class="fa-solid fa-plug"></i>
+                <span>جارٍ التوصيل... انقر على نقطة المكوّن الثاني للربط</span>
+                <button onclick="app.cancelWireConnection()" class="text-rose-400 hover:text-rose-300 mr-2"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <button onclick="app.resetCamera()" title="إعادة ضبط الكاميرا" class="p-2.5 glass-panel rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/80 transition shadow-lg">
+                <i class="fa-solid fa-arrows-to-dot"></i>
+            </button>
+            <button id="toggle-electrons-btn" onclick="app.toggleElectrons()" title="إظهار/إخفاء حركة الكهرباء" class="p-2.5 glass-panel rounded-xl text-amber-400 hover:bg-slate-800/80 transition shadow-lg">
+                <i class="fa-solid fa-atom"></i>
+            </button>
+        </div>
+
+        <!-- Toast Messages -->
+        <div id="toast" class="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 glass-panel border border-amber-500/40 px-6 py-3 rounded-2xl text-amber-300 font-bold text-xs shadow-2xl transition duration-300 opacity-0 pointer-events-none transform translate-y-4">
+            تنبيه حركي!
+        </div>
+    </main>
+
+    <!-- Stage Navigation Warning Modal -->
+    <div id="confirm-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 hidden">
+        <div class="glass-panel border border-amber-500/30 rounded-3xl max-w-sm w-full p-6 shadow-2xl relative text-center">
+            <div class="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-xl mx-auto mb-3 border border-amber-500/30">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <h3 class="text-base font-bold text-slate-100 mb-2">تأكيد الانتقال بين المراحل</h3>
+            <p id="confirm-modal-text" class="text-xs text-slate-300 leading-relaxed mb-5">
+                تنبيه: هل أنت تأكد من الانتقال إلى هذه المرحلة؟ لن تتمكن من العودة إلى المرحلة السابقة أثناء هذا التحدي.
+            </p>
+            <div class="flex items-center gap-3">
+                <button onclick="app.confirmStageSwitch()" class="flex-1 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition shadow-lg shadow-amber-500/20">
+                    موافق، انتقل
+                </button>
+                <button onclick="app.closeConfirmModal()" class="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition border border-slate-700">
+                    إلغاء
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quiz Modal -->
+    <div id="quiz-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 hidden">
+        <div class="glass-panel border border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl relative">
+            <button onclick="app.closeQuizModal()" class="absolute top-4 left-4 text-slate-500 hover:text-white">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            <h3 class="text-lg font-bold text-amber-400 mb-1 flex items-center gap-2">
+                <i class="fa-solid fa-graduation-cap"></i> اختبار المرحلة الأولى
+            </h3>
+            <p class="text-xs text-slate-400 mb-4">أجب عن الأسئلة لفتح مرحلة المختبر الحر:</p>
+
+            <div id="quiz-content" class="space-y-4">
+                <!-- Dynamically Inserted -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global Constants & Component Definitions
+        const COMPONENTS_DATA = {
+            battery: {
+                name: "بطارية (مصدر الكهرباء)",
+                symbol: "DC Battery (-|||+)",
+                desc: "تزود الدائرة بالكهرباء والقدرة اللازمة لتحريك التيار وتشغيل المكونات.",
+                physics: "حالة البطارية: مشحونة وجاهزة",
+                resistance: 0.1,
+                voltage: 9
+            },
+            bulb: {
+                name: "مصباح كهربائي",
+                symbol: "-(X)-",
+                desc: "يحول الكهرباء إلى ضوء عند مرور التيار فيه.",
+                physics: "حالة المصباح: يعمل بالكهرباء",
+                resistance: 10,
+                voltage: 0
+            },
+            switch: {
+                name: "مفتاح كهربائي",
+                symbol: "─/ ─",
+                desc: "أداة للتحكم في فتح وإغلاق الدائرة الكهربائية للتحكم في تدفق الكهرباء.",
+                physics: "مغلق = تسمح بمرور الكهرباء / مفتوح = تمنع المرور",
+                resistance: 0,
+                voltage: 0
+            },
+            wire: {
+                name: "سلك توصيل",
+                symbol: "───────",
+                desc: "ينقل الكهرباء بين أجزاء الدائرة الكهربائية بسهولة.",
+                physics: "ناقل ممتاز للكهرباء",
+                resistance: 0.05,
+                voltage: 0
+            },
+            motor: {
+                name: "محرك صغير",
+                symbol: "─(M)─",
+                desc: "يحول الكهرباء إلى حركة ودوران.",
+                physics: "يدور عند سريان الكهرباء",
+                resistance: 15,
+                voltage: 0
+            },
+            buzzer: {
+                name: "جرس كهربائي",
+                symbol: "─(🕭)─",
+                desc: "يحول الكهرباء إلى صوت وتنبيه.",
+                physics: "يشغل الصفيح عند مرور الكهرباء",
+                resistance: 12,
+                voltage: 0
+            }
+        };
+
+        const STAGE1_QUIZ = [
+            {
+                q: "ما الشرط الأساسي لكي تضيء اللمبة (المصباح)؟",
+                options: ["أن تكون الدائرة مفتوحة", "أن تكون الدائرة مغلقة وموصلة بالبطارية بالأسلاك", "عدم وجود أسلاك للتوصيل", "قطع السلك الكهربائي"],
+                correct: 1
+            },
+            {
+                q: "ماذا يحدث عند فتح المفتاح الكهربائي؟",
+                options: ["تتوقف الكهرباء وتنطفئ اللمبة", "تزيد سرعة الكهرباء", "تضيء اللمبة أكثر", "تنفجر البطارية"],
+                correct: 0
+            },
+            {
+                q: "ما هي وظيفة سلك التوصيل في الدائرة الكهربائية؟",
+                options: ["صنع الكهرباء من اللاشيء", "نقل الكهرباء بين البطارية واللمبة لإغلاق الدائرة", "إطفاء الكهرباء تلقائياً", "تغيير لون اللمبة"],
+                correct: 1
+            }
+        ];
+
+        class ElectricLabApp {
+            constructor() {
+                this.currentStage = 1;
+                this.highestStageReached = 1;
+                this.pendingStage = null;
+                this.score = 0;
+                this.showElectrons = true;
+                this.labComponents = [];
+                this.wires = []; // Interactive physical wires created by node connection
+                this.electronsParticles = [];
+                this.circuitClosed = false;
+                this.selectedTerminal = null;
+                this.terminalMeshes = [];
+
+                this.initThreeJS();
+                this.initEventListeners();
+                this.initRaycaster();
+                this.loadStage(1);
+                this.animate();
+            }
+
+            initThreeJS() {
+                const container = document.getElementById('canvas-container');
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x0b0f19);
+
+                this.camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+                this.camera.position.set(0, 15, 25);
+
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setSize(container.clientWidth, container.clientHeight);
+                this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                container.appendChild(this.renderer.domElement);
+
+                this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+                this.controls.enableDamping = true;
+                this.controls.dampingFactor = 0.05;
+
+                // Lighting Setup
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+                this.scene.add(ambientLight);
+
+                const dirLight = new THREE.DirectionalLight(0xfff5ea, 1.2);
+                dirLight.position.set(10, 20, 15);
+                dirLight.castShadow = true;
+                dirLight.shadow.mapSize.width = 2048;
+                dirLight.shadow.mapSize.height = 2048;
+                this.scene.add(dirLight);
+
+                const pointLight = new THREE.PointLight(0xf59e0b, 0.5, 20);
+                pointLight.position.set(0, 5, 0);
+                this.scene.add(pointLight);
+
+                // Lab Table Base Mesh
+                const tableGeo = new THREE.BoxGeometry(30, 0.8, 18);
+                const tableMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4, metalness: 0.2 });
+                this.tableMesh = new THREE.Mesh(tableGeo, tableMat);
+                this.tableMesh.position.y = -0.4;
+                this.tableMesh.receiveShadow = true;
+                this.scene.add(this.tableMesh);
+
+                const gridHelper = new THREE.GridHelper(30, 30, 0x334155, 0x1e293b);
+                gridHelper.position.y = 0.01;
+                this.scene.add(gridHelper);
+            }
+
+            initRaycaster() {
+                this.raycaster = new THREE.Raycaster();
+                this.mouse = new THREE.Vector2();
+
+                const container = document.getElementById('canvas-container');
+                container.addEventListener('click', (e) => this.onCanvasClick(e));
+            }
+
+            onCanvasClick(event) {
+                const container = document.getElementById('canvas-container');
+                const rect = container.getBoundingClientRect();
+                this.mouse.x = ((event.clientX - rect.left) / container.clientWidth) * 2 - 1;
+                this.mouse.y = -((event.clientY - rect.top) / container.clientHeight) * 2 + 1;
+
+                this.raycaster.setFromCamera(this.mouse, this.camera);
+                
+                // First check click on terminals for wiring
+                const terminalIntersects = this.raycaster.intersectObjects(this.terminalMeshes);
+                if (terminalIntersects.length > 0) {
+                    const clickedTerminal = terminalIntersects[0].object;
+                    this.handleTerminalClick(clickedTerminal);
+                    return;
+                }
+
+                // Check click on existing wires for removal
+                const wireMeshes = this.wires.map(w => w.mesh);
+                const wireIntersects = this.raycaster.intersectObjects(wireMeshes);
+                if (wireIntersects.length > 0) {
+                    const clickedWireMesh = wireIntersects[0].object;
+                    this.removeWireMesh(clickedWireMesh);
+                }
+            }
+
+            removeWireMesh(wireMesh) {
+                const wireIdx = this.wires.findIndex(w => w.mesh === wireMesh);
+                if (wireIdx !== -1) {
+                    this.scene.remove(wireMesh);
+                    this.wires.splice(wireIdx, 1);
+                    this.showToast("تم حذف السلك بنجاح!");
+                    this.calculateCircuitPhysics();
+                }
+            }
+
+            requestStageSwitch(targetStage) {
+                if (targetStage === this.currentStage) return;
+
+                // Prevent moving back to lower stages if student progressed
+                if (targetStage < this.highestStageReached) {
+                    this.showToast("عذراً، لا يمكنك الرجوع إلى المرحلة السابقة بعد التقدم!");
+                    return;
+                }
+
+                this.pendingStage = targetStage;
+                const modalText = document.getElementById('confirm-modal-text');
+                if (targetStage > this.currentStage) {
+                    modalText.innerText = `هل أنت تأكد من الانتقال إلى المرحلة ${targetStage}؟ لن تتمكن من الرجوع للمرحلة الحالية بعد الانتقال.`;
+                } else {
+                    modalText.innerText = "هل أنت متأكد من الانتقال إلى هذه المرحلة؟";
+                }
+
+                document.getElementById('confirm-modal').classList.remove('hidden');
+            }
+
+            confirmStageSwitch() {
+                if (this.pendingStage) {
+                    const nextStage = this.pendingStage;
+                    this.closeConfirmModal();
+                    if (nextStage > this.highestStageReached) {
+                        this.highestStageReached = nextStage;
+                    }
+                    this.loadStage(nextStage);
+                }
+            }
+
+            closeConfirmModal() {
+                document.getElementById('confirm-modal').classList.add('hidden');
+                this.pendingStage = null;
+            }
+
+            createTerminalMesh(terminalId, position, parentGroup, colorHex = 0xf59e0b) {
+                const geo = new THREE.SphereGeometry(0.3, 16, 16);
+                const mat = new THREE.MeshStandardMaterial({
+                    color: colorHex,
+                    emissive: colorHex,
+                    emissiveIntensity: 0.5,
+                    roughness: 0.2
+                });
+                const terminal = new THREE.Mesh(geo, mat);
+                terminal.position.copy(position);
+                terminal.userData.terminalId = terminalId;
+                terminal.userData.parentGroup = parentGroup;
+
+                parentGroup.add(terminal);
+                this.terminalMeshes.push(terminal);
+                return terminal;
+            }
+
+            create3DComponentMesh(type, compId) {
+                const group = new THREE.Group();
+                group.userData.compId = compId;
+                group.userData.type = type;
+
+                if (type === 'battery') {
+                    // Battery Body
+                    const bodyGeo = new THREE.CylinderGeometry(1, 1, 3, 32);
+                    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.8, roughness: 0.2 });
+                    const body = new THREE.Mesh(bodyGeo, bodyMat);
+                    body.rotation.z = Math.PI / 2;
+                    body.castShadow = true;
+                    group.add(body);
+
+                    // Terminals (Positive & Negative)
+                    const term1 = this.createTerminalMesh(`${compId}_pos`, new THREE.Vector3(1.8, 0, 0), group, 0xef4444); // Red (+)
+                    const term2 = this.createTerminalMesh(`${compId}_neg`, new THREE.Vector3(-1.8, 0, 0), group, 0x3b82f6); // Blue (-)
+                    group.userData.terminals = [term1, term2];
+                } 
+                else if (type === 'bulb') {
+                    // Base
+                    const baseGeo = new THREE.CylinderGeometry(0.8, 0.8, 0.8, 32);
+                    const baseMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.9 });
+                    const base = new THREE.Mesh(baseGeo, baseMat);
+                    base.position.y = 0.4;
+                    group.add(base);
+
+                    // Glass Bulb
+                    const glassGeo = new THREE.SphereGeometry(1.2, 32, 32);
+                    const glassMat = new THREE.MeshPhysicalMaterial({ 
+                        color: 0xffffff, 
+                        transmission: 0.8, 
+                        opacity: 1, 
+                        transparent: true, 
+                        roughness: 0.1 
+                    });
+                    const glass = new THREE.Mesh(glassGeo, glassMat);
+                    glass.position.y = 1.8;
+                    group.add(glass);
+
+                    // Filament Light Source Inside
+                    const light = new THREE.PointLight(0xffb703, 0, 10);
+                    light.position.y = 1.8;
+                    group.add(light);
+                    group.userData.lightSource = light;
+
+                    // Terminals
+                    const term1 = this.createTerminalMesh(`${compId}_t1`, new THREE.Vector3(-1, 0.2, 0), group, 0xf59e0b);
+                    const term2 = this.createTerminalMesh(`${compId}_t2`, new THREE.Vector3(1, 0.2, 0), group, 0xf59e0b);
+                    group.userData.terminals = [term1, term2];
+                }
+                else if (type === 'switch') {
+                    const baseGeo = new THREE.BoxGeometry(3, 0.3, 2);
+                    const baseMat = new THREE.MeshStandardMaterial({ color: 0x334155 });
+                    const base = new THREE.Mesh(baseGeo, baseMat);
+                    base.position.y = 0.15;
+                    group.add(base);
+
+                    const leverGeo = new THREE.BoxGeometry(2, 0.2, 0.3);
+                    const leverMat = new THREE.MeshStandardMaterial({ color: 0xef4444 });
+                    const lever = new THREE.Mesh(leverGeo, leverMat);
+                    lever.position.set(0, 0.5, 0);
+                    group.add(lever);
+
+                    const term1 = this.createTerminalMesh(`${compId}_t1`, new THREE.Vector3(-1.2, 0.4, 0), group, 0x10b981);
+                    const term2 = this.createTerminalMesh(`${compId}_t2`, new THREE.Vector3(1.2, 0.4, 0), group, 0x10b981);
+                    group.userData.terminals = [term1, term2];
+                }
+                else if (type === 'wire') {
+                    const wireGeo = new THREE.CylinderGeometry(0.15, 0.15, 4, 16);
+                    const wireMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, metalness: 0.3 });
+                    const wire = new THREE.Mesh(wireGeo, wireMat);
+                    wire.rotation.z = Math.PI / 2;
+                    wire.position.y = 0.15;
+                    group.add(wire);
+
+                    const term1 = this.createTerminalMesh(`${compId}_t1`, new THREE.Vector3(-2, 0.15, 0), group, 0x06b6d4);
+                    const term2 = this.createTerminalMesh(`${compId}_t2`, new THREE.Vector3(2, 0.15, 0), group, 0x06b6d4);
+                    group.userData.terminals = [term1, term2];
+                }
+                else if (type === 'motor') {
+                    const motorGeo = new THREE.CylinderGeometry(1.2, 1.2, 2, 32);
+                    const motorMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.7 });
+                    const motor = new THREE.Mesh(motorGeo, motorMat);
+                    motor.position.y = 1;
+                    group.add(motor);
+
+                    const bladeGeo = new THREE.BoxGeometry(2.5, 0.1, 0.4);
+                    const bladeMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0 });
+                    const blade = new THREE.Mesh(bladeGeo, bladeMat);
+                    blade.position.y = 2.1;
+                    group.add(blade);
+                    group.userData.fanBlade = blade;
+
+                    const term1 = this.createTerminalMesh(`${compId}_t1`, new THREE.Vector3(-1.2, 0.3, 0), group, 0x0284c7);
+                    const term2 = this.createTerminalMesh(`${compId}_t2`, new THREE.Vector3(1.2, 0.3, 0), group, 0x0284c7);
+                    group.userData.terminals = [term1, term2];
+                }
+                else if (type === 'buzzer') {
+                    const buzzerGeo = new THREE.CylinderGeometry(1.2, 1, 1.2, 32);
+                    const buzzerMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.3 });
+                    const buzzer = new THREE.Mesh(buzzerGeo, buzzerMat);
+                    buzzer.position.y = 0.6;
+                    group.add(buzzer);
+
+                    const term1 = this.createTerminalMesh(`${compId}_t1`, new THREE.Vector3(-1, 0.3, 0), group, 0xd97706);
+                    const term2 = this.createTerminalMesh(`${compId}_t2`, new THREE.Vector3(1, 0.3, 0), group, 0xd97706);
+                    group.userData.terminals = [term1, term2];
+                }
+
+                return group;
+            }
+
+            onCanvasClick(event) {
+                const container = document.getElementById('canvas-container');
+                const rect = container.getBoundingClientRect();
+                this.mouse.x = ((event.clientX - rect.left) / container.clientWidth) * 2 - 1;
+                this.mouse.y = -((event.clientY - rect.top) / container.clientHeight) * 2 + 1;
+
+                this.raycaster.setFromCamera(this.mouse, this.camera);
+                const intersects = this.raycaster.intersectObjects(this.terminalMeshes);
+
+                if (intersects.length > 0) {
+                    const clickedTerminal = intersects[0].object;
+                    this.handleTerminalClick(clickedTerminal);
+                }
+            }
+
+            handleTerminalClick(terminalMesh) {
+                if (!this.selectedTerminal) {
+                    // First terminal selected
+                    this.selectedTerminal = terminalMesh;
+                    terminalMesh.material.emissiveIntensity = 1.0;
+                    terminalMesh.scale.set(1.4, 1.4, 1.4);
+                    document.getElementById('wire-connecting-badge').classList.remove('hidden');
+                    this.showToast("اخترت النقطة الأولى! انقر الآن على نقطة المكوّن الثاني للتوصيل بينهما بالسلك.");
+                } else {
+                    if (this.selectedTerminal === terminalMesh) {
+                        this.cancelWireConnection();
+                        return;
+                    }
+
+                    // Connect wire between selectedTerminal and terminalMesh
+                    this.create3DWireConnection(this.selectedTerminal, terminalMesh);
+                    
+                    // Reset selection
+                    this.selectedTerminal.material.emissiveIntensity = 0.5;
+                    this.selectedTerminal.scale.set(1, 1, 1);
+                    this.selectedTerminal = null;
+                    document.getElementById('wire-connecting-badge').classList.add('hidden');
+                    
+                    this.calculateCircuitPhysics();
+                }
+            }
+
+            cancelWireConnection() {
+                if (this.selectedTerminal) {
+                    this.selectedTerminal.material.emissiveIntensity = 0.5;
+                    this.selectedTerminal.scale.set(1, 1, 1);
+                    this.selectedTerminal = null;
+                }
+                document.getElementById('wire-connecting-badge').classList.add('hidden');
+            }
+
+            create3DWireConnection(termA, termB) {
+                const worldPosA = new THREE.Vector3();
+                const worldPosB = new THREE.Vector3();
+                termA.getWorldPosition(worldPosA);
+                termB.getWorldPosition(worldPosB);
+
+                const distance = worldPosA.distanceTo(worldPosB);
+                const wireGeo = new THREE.CylinderGeometry(0.08, 0.08, distance, 16);
+                const wireMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, metalness: 0.5, roughness: 0.2 });
+                const wireMesh = new THREE.Mesh(wireGeo, wireMat);
+
+                const midPoint = new THREE.Vector3().addVectors(worldPosA, worldPosB).multiplyScalar(0.5);
+                wireMesh.position.copy(midPoint);
+
+                wireMesh.lookAt(worldPosB);
+                wireMesh.rotateX(Math.PI / 2);
+
+                this.scene.add(wireMesh);
+                this.wires.push({
+                    mesh: wireMesh,
+                    from: termA.userData.terminalId,
+                    to: termB.userData.terminalId,
+                    compA: termA.userData.parentGroup.userData.compId,
+                    compB: termB.userData.parentGroup.userData.compId
+                });
+
+                this.showToast("تم توصيل السلك بنجاح بين النقاط!");
+            }
+
+            addLabComponent(type) {
+                const compId = `comp_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+                const mesh = this.create3DComponentMesh(type, compId);
+                const count = this.labComponents.length;
+                const posX = (count % 3) * 6 - 6;
+                const posZ = Math.floor(count / 3) * 5 - 2;
+                
+                mesh.position.set(posX, 1, posZ);
+                this.scene.add(mesh);
+                this.labComponents.push({ id: compId, type, mesh });
+
+                this.calculateCircuitPhysics();
+            }
+
+            resetLabBoard() {
+                this.clearLabScene();
+                this.calculateCircuitPhysics();
+                this.showToast("تم تفريغ لوحة العمل بنجاح! الطاولة جاهزة للبناء.");
+            }
+
+            clearLabScene() {
+                this.labComponents.forEach(c => {
+                    this.scene.remove(c.mesh);
+                });
+                this.wires.forEach(w => {
+                    this.scene.remove(w.mesh);
+                });
+                this.labComponents = [];
+                this.wires = [];
+                this.terminalMeshes = [];
+                this.cancelWireConnection();
+                this.clearElectrons();
+            }
+
+            calculateCircuitPhysics() {
+                const hasBattery = this.labComponents.some(c => c.type === 'battery');
+                const hasBulb = this.labComponents.some(c => c.type === 'bulb');
+                const wireCount = this.wires.length;
+
+                const statusIndicator = document.getElementById('status-indicator');
+                const statusText = document.getElementById('status-text');
+
+                if (this.labComponents.length === 0) {
+                    this.circuitClosed = false;
+                    statusIndicator.className = "w-2.5 h-2.5 rounded-full bg-slate-500";
+                    statusText.innerText = "مفتوحة - لا توجد عناصر";
+                    statusText.className = "font-bold text-slate-400";
+                    document.getElementById('voltage-text').innerText = "لا توجد بطارية";
+                    document.getElementById('current-text').innerText = "متوقفة (0)";
+                    this.renderElectronsFlow(false);
+                    return;
+                }
+
+                // Check physical loop connection with terminals and at least 2 wires connecting battery & bulb
+                const batteryComp = this.labComponents.find(c => c.type === 'battery');
+                const bulbComp = this.labComponents.find(c => c.type === 'bulb');
+
+                let isLoopConnected = false;
+                if (batteryComp && bulbComp && wireCount >= 2) {
+                    const batteryWires = this.wires.filter(w => w.compA === batteryComp.id || w.compB === batteryComp.id);
+                    const bulbWires = this.wires.filter(w => w.compA === bulbComp.id || w.compB === bulbComp.id);
+                    if (batteryWires.length >= 2 && bulbWires.length >= 2) {
+                        isLoopConnected = true;
+                    }
+                }
+
+                if (hasBattery && hasBulb && isLoopConnected) {
+                    this.circuitClosed = true;
+                    statusIndicator.className = "w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping";
+                    statusText.innerText = "دائرة مغلقة وموصلة النقاط بنجاح";
+                    statusText.className = "font-bold text-emerald-400";
+                    document.getElementById('voltage-text').innerText = "قوية (مشحونة)";
+                    document.getElementById('current-text').innerText = "تسري بنجاح";
+
+                    this.labComponents.forEach(c => {
+                        if (c.type === 'bulb') this.updateBulbState(c.mesh, true);
+                    });
+                    this.renderElectronsFlow(true);
+                } else {
+                    this.circuitClosed = false;
+                    statusIndicator.className = "w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping";
+                    statusText.innerText = wireCount < 2 ? "قم بتوصيل النقاط بالسلكين لإغلاق الدائرة" : "دائرة غير مكتملة الربط";
+                    statusText.className = "font-bold text-amber-400";
+                    document.getElementById('voltage-text').innerText = "ضعيفة / غير متصلة";
+                    document.getElementById('current-text').innerText = "متوقفة (0)";
+
+                    this.labComponents.forEach(c => {
+                        if (c.type === 'bulb') this.updateBulbState(c.mesh, false);
+                    });
+                    this.renderElectronsFlow(false);
+                }
+            }
+
+            // Demonstrate a complete functional circuit in Stage 1 with terminal connection wires
+            showFullCircuitDemo() {
+                this.clearLabScene();
+                
+                this.addLabComponent('battery');
+                this.addLabComponent('bulb');
+
+                if (this.labComponents[0]) this.labComponents[0].mesh.position.set(-5, 1, 0);
+                if (this.labComponents[1]) this.labComponents[1].mesh.position.set(5, 1, 0);
+
+                const batteryGroup = this.labComponents[0].mesh;
+                const bulbGroup = this.labComponents[1].mesh;
+
+                const batteryTerms = batteryGroup.userData.terminals;
+                const bulbTerms = bulbGroup.userData.terminals;
+
+                if (batteryTerms && bulbTerms) {
+                    this.create3DWireConnection(batteryTerms[0], bulbTerms[0]);
+                    this.create3DWireConnection(batteryTerms[1], bulbTerms[1]);
+                }
+
+                this.calculateCircuitPhysics();
+                this.showToast("تم إنشاء دائرة كاملة وتوصيل نقاط البطارية بالمصباح عبر الأسلاك بنجاح!");
+            }
+
+            loadStage(stageNum) {
+                this.currentStage = stageNum;
+
+                // Hide all sidebar panels
+                document.getElementById('panel-stage-1').classList.add('hidden');
+                document.getElementById('panel-stage-2').classList.add('hidden');
+                document.getElementById('panel-stage-3').classList.add('hidden');
+
+                // Reset stage buttons style
+                [1, 2, 3].forEach(i => {
+                    const btn = document.getElementById(`btn-stage-${i}`);
+                    btn.className = "px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-white hover:bg-slate-800/50";
+                });
+
+                // Activate active button
+                const activeBtn = document.getElementById(`btn-stage-${stageNum}`);
+                activeBtn.className = "px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20";
+
+                document.getElementById(`panel-stage-${stageNum}`).classList.remove('hidden');
+
+                // Clear existing components on scene
+                this.clearLabScene();
+
+                if (stageNum === 1) {
+                    this.selectLearnComponent('battery');
+                } else if (stageNum === 2) {
+                    // Stage 2 starts with completely empty board
+                    this.calculateCircuitPhysics();
+                } else if (stageNum === 3) {
+                    this.setupStage3Puzzle();
+                }
+            }
+
+            switchStage(stageNum) {
+                this.loadStage(stageNum);
+            }
+
+            selectLearnComponent(type) {
+                this.clearLabScene();
+                const compData = COMPONENTS_DATA[type];
+
+                document.getElementById('info-comp-name').innerText = compData.name;
+                document.getElementById('info-comp-symbol').innerText = compData.symbol;
+                document.getElementById('info-comp-desc').innerText = compData.desc;
+                document.getElementById('info-comp-physics').innerText = compData.physics;
+
+                const mesh = this.create3DComponentMesh(type);
+                mesh.position.set(0, 1, 0);
+                mesh.scale.set(1.5, 1.5, 1.5);
+                this.scene.add(mesh);
+                this.labComponents.push({ type, mesh });
+            }
+
+            addLabComponent(type) {
+                const mesh = this.create3DComponentMesh(type);
+                const count = this.labComponents.length;
+                const posX = (count % 3) * 5 - 5;
+                const posZ = Math.floor(count / 3) * 5 - 3;
+                
+                mesh.position.set(posX, 1, posZ);
+                this.scene.add(mesh);
+                this.labComponents.push({ type, mesh });
+
+                this.calculateCircuitPhysics();
+            }
+
+            resetLabBoard() {
+                this.clearLabScene();
+                this.calculateCircuitPhysics();
+                this.showToast("تم تفريغ لوحة العمل بنجاح! الطاولة جاهزة للبناء.");
+            }
+
+            clearLabScene() {
+                this.labComponents.forEach(c => {
+                    this.scene.remove(c.mesh);
+                });
+                this.labComponents = [];
+                this.clearElectrons();
+            }
+
+            calculateCircuitPhysics() {
+                const hasBattery = this.labComponents.some(c => c.type === 'battery');
+                const hasBulb = this.labComponents.some(c => c.type === 'bulb');
+                const wireCount = this.labComponents.filter(c => c.type === 'wire').length;
+
+                const statusIndicator = document.getElementById('status-indicator');
+                const statusText = document.getElementById('status-text');
+
+                if (this.labComponents.length === 0) {
+                    this.circuitClosed = false;
+                    statusIndicator.className = "w-2.5 h-2.5 rounded-full bg-slate-500";
+                    statusText.innerText = "مفتوحة - لا توجد عناصر";
+                    statusText.className = "font-bold text-slate-400";
+                    document.getElementById('voltage-text').innerText = "لا توجد بطارية";
+                    document.getElementById('current-text').innerText = "متوقفة (0)";
+                    this.renderElectronsFlow(false);
+                    return;
+                }
+
+                // Check if the circuit has all essential components AND at least TWO wires
+                if (hasBattery && hasBulb && wireCount >= 2) {
+                    this.circuitClosed = true;
+                    statusIndicator.className = "w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping";
+                    statusText.innerText = "دائرة مغلقة وسليمة";
+                    statusText.className = "font-bold text-emerald-400";
+                    document.getElementById('voltage-text').innerText = "قوية (مشحونة)";
+                    document.getElementById('current-text').innerText = "تسري بنجاح";
+
+                    // Turn on lighting and electrons when circuit is complete and valid
+                    this.labComponents.forEach(c => {
+                        if (c.type === 'bulb') this.updateBulbState(c.mesh, true);
+                    });
+                    this.renderElectronsFlow(true);
+                } else {
+                    this.circuitClosed = false;
+                    statusIndicator.className = "w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping";
+                    statusText.innerText = wireCount < 2 && hasBattery && hasBulb ? "تحتاج سلكين على الأقل لتوصيل القطبين" : "دائرة غير مكتملة";
+                    statusText.className = "font-bold text-amber-400";
+                    document.getElementById('voltage-text').innerText = "ضعيفة / غير متصلة";
+                    document.getElementById('current-text').innerText = "متوقفة (0)";
+
+                    // Turn off bulb lighting if incomplete
+                    this.labComponents.forEach(c => {
+                        if (c.type === 'bulb') this.updateBulbState(c.mesh, false);
+                    });
+                    this.renderElectronsFlow(false);
+                }
+            }
+
+            // Demonstrate a complete functional circuit in Stage 1
+            showFullCircuitDemo() {
+                this.clearLabScene();
+                
+                // Add battery, 2 wires, and bulb to form a complete circuit
+                this.addLabComponent('battery');
+                this.addLabComponent('wire');
+                this.addLabComponent('wire');
+                this.addLabComponent('bulb');
+
+                // Adjust positioning for a neat layout on the table
+                if (this.labComponents[0]) this.labComponents[0].mesh.position.set(-6, 1, 0);
+                if (this.labComponents[1]) this.labComponents[1].mesh.position.set(-2, 1, 0);
+                if (this.labComponents[2]) this.labComponents[2].mesh.position.set(2, 1, 0);
+                if (this.labComponents[3]) this.labComponents[3].mesh.position.set(6, 1, 0);
+
+                this.calculateCircuitPhysics();
+                this.showToast("تم إنشاء دائرة كهربائية كاملة بسلكين! المصباح يضيء وتتدفق الكهرباء.");
+            }
+
+            updateBulbState(mesh, turnOn) {
+                if (mesh.userData.lightSource) {
+                    mesh.userData.lightSource.intensity = turnOn ? 2.5 : 0;
+                }
+            }
+
+            renderElectronsFlow(active) {
+                this.clearElectrons();
+                if (!active || !this.showElectrons) return;
+
+                const particleCount = 20;
+                const geometry = new THREE.SphereGeometry(0.12, 8, 8);
+                const material = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+
+                for (let i = 0; i < particleCount; i++) {
+                    const particle = new THREE.Mesh(geometry, material);
+                    const angle = (i / particleCount) * Math.PI * 2;
+                    particle.position.set(Math.cos(angle) * 6, 1.2, Math.sin(angle) * 4);
+                    this.scene.add(particle);
+                    this.electronsParticles.push({ mesh: particle, angle });
+                }
+            }
+
+            clearElectrons() {
+                this.electronsParticles.forEach(p => this.scene.remove(p.mesh));
+                this.electronsParticles = [];
+            }
+
+            toggleElectrons() {
+                this.showElectrons = !this.showElectrons;
+                const btn = document.getElementById('toggle-electrons-btn');
+                btn.className = this.showElectrons ? 
+                    "p-2.5 glass-panel rounded-xl text-amber-400 hover:bg-slate-800/80 transition shadow-lg" : 
+                    "p-2.5 glass-panel rounded-xl text-slate-500 hover:bg-slate-800/80 transition shadow-lg";
+                this.calculateCircuitPhysics();
+            }
+
+            startStage1Quiz() {
+                const modal = document.getElementById('quiz-modal');
+                const content = document.getElementById('quiz-content');
+                content.innerHTML = '';
+
+                STAGE1_QUIZ.forEach((q, idx) => {
+                    const qBox = document.createElement('div');
+                    qBox.className = 'bg-slate-900 p-3 rounded-2xl border border-slate-800';
+                    qBox.innerHTML = `
+                        <p class="text-xs font-bold text-slate-200 mb-2">${idx + 1}. ${q.q}</p>
+                        <div class="space-y-1.5">
+                            ${q.options.map((opt, oIdx) => `
+                                <button onclick="app.submitQuizAnswer(${idx}, ${oIdx})" class="w-full text-right p-2 rounded-xl bg-slate-950 hover:bg-amber-500/10 hover:border-amber-500/40 border border-slate-800 text-xs text-slate-300 transition">
+                                    ${opt}
+                                </button>
+                            `).join('')}
+                        </div>
+                    `;
+                    content.appendChild(qBox);
+                });
+
+                modal.classList.remove('hidden');
+            }
+
+            submitQuizAnswer(qIndex, optionIndex) {
+                if (optionIndex === STAGE1_QUIZ[qIndex].correct) {
+                    this.score += 20;
+                    document.getElementById('score-display').innerText = this.score;
+                    this.showToast("إجابة صحيحة! أحسنت (+20 نقطة)");
+                    this.closeQuizModal();
+                    this.switchStage(2);
+                } else {
+                    this.showToast("إجابة غير صحيحة، حاول مرة أخرى!");
+                }
+            }
+
+            closeQuizModal() {
+                document.getElementById('quiz-modal').classList.add('hidden');
+            }
+
+            setupStage3Puzzle() {
+                // Set up initial faulty circuit with bulb, switch, and connecting wires (Missing Battery)
+                this.addLabComponent('bulb');
+                this.addLabComponent('switch');
+                this.addLabComponent('wire');
+
+                if (this.labComponents[0]) this.labComponents[0].mesh.position.set(-4, 1, 0);
+                if (this.labComponents[1]) this.labComponents[1].mesh.position.set(0, 1, 0);
+                if (this.labComponents[2]) this.labComponents[2].mesh.position.set(4, 1, 0);
+
+                const bulbTerms = this.labComponents[0].mesh.userData.terminals;
+                const switchTerms = this.labComponents[1].mesh.userData.terminals;
+                const wireTerms = this.labComponents[2].mesh.userData.terminals;
+
+                if (bulbTerms && switchTerms && wireTerms) {
+                    this.create3DWireConnection(bulbTerms[1], switchTerms[0]);
+                    this.create3DWireConnection(switchTerms[1], wireTerms[0]);
+                }
+
+                this.calculateCircuitPhysics();
+                document.getElementById('hint-display').classList.add('hidden');
+                document.getElementById('student-answer-input').value = '';
+            }
+
+            getHint() {
+                document.getElementById('hint-display').classList.remove('hidden');
+                if (this.score >= 5) {
+                    this.score -= 5;
+                    document.getElementById('score-display').innerText = this.score;
+                }
+            }
+
+            checkStage3Solution() {
+                const answerText = document.getElementById('student-answer-input').value.trim();
+                
+                if (answerText.length === 0) {
+                    this.showToast("يرجى كتابة إجابتك في الخانة أولاً قبل إرسال الحل!");
+                    return;
+                }
+
+                this.score += 30;
+                document.getElementById('score-display').innerText = this.score;
+                this.circuitClosed = true;
+                
+                this.labComponents.forEach(c => {
+                    if (c.type === 'bulb') this.updateBulbState(c.mesh, true);
+                });
+                this.renderElectronsFlow(true);
+                
+                document.getElementById('status-text').innerText = "تم إصلاح الدائرة بنجاح!";
+                document.getElementById('status-text').className = "font-bold text-emerald-400";
+                document.getElementById('voltage-text').innerText = "قوية (مشحونة)";
+                document.getElementById('current-text').innerText = "تسري بنجاح";
+
+                this.showToast("ممتاز جداً! تم تسليم إجابتك وإصلاح الدائرة بنجاح (+30 نقطة)");
+            }
+
+            checkLabCircuit() {
+                const wireCount = this.wires.length;
+                
+                if (this.circuitClosed) {
+                    this.score += 15;
+                    document.getElementById('score-display').innerText = this.score;
+                    
+                    this.labComponents.forEach(c => {
+                        if (c.type === 'bulb') this.updateBulbState(c.mesh, true);
+                    });
+                    this.renderElectronsFlow(true);
+
+                    this.showToast("أحسنت! الإجابة صحيحة، تم ربط النقاط بالسلكين والمصباح يضيء الآن بنجاح (+15 نقطة)");
+                } else {
+                    if (wireCount < 2) {
+                        this.showToast("الدائرة لا تعمل! انقر على نقطة البطارية ثم نقطة المصباح لربط السلكين.");
+                    } else {
+                        this.showToast("الدائرة غير مكتملة التوصيل، يرجى التأكد من ربط طرفي البطارية بطفري المصباح بالأسلاك!");
+                    }
+                }
+            }
+
+            resetCamera() {
+                this.camera.position.set(0, 15, 25);
+                this.controls.target.set(0, 0, 0);
+                this.controls.update();
+            }
+
+            showToast(msg) {
+                const toast = document.getElementById('toast');
+                toast.innerText = msg;
+                toast.classList.remove('opacity-0', 'translate-y-4', 'pointer-events-none');
+                setTimeout(() => {
+                    toast.classList.add('opacity-0', 'translate-y-4', 'pointer-events-none');
+                }, 3000);
+            }
+
+            initEventListeners() {
+                window.addEventListener('resize', () => {
+                    const container = document.getElementById('canvas-container');
+                    this.camera.aspect = container.clientWidth / container.clientHeight;
+                    this.camera.updateProjectionMatrix();
+                    this.renderer.setSize(container.clientWidth, container.clientHeight);
+                });
+            }
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+
+                // Rotate components gently in Stage 1
+                if (this.currentStage === 1 && this.labComponents.length > 0) {
+                    this.labComponents[0].mesh.rotation.y += 0.008;
+                }
+
+                // Animate electrons moving along loop
+                if (this.circuitClosed && this.showElectrons) {
+                    this.electronsParticles.forEach(p => {
+                        p.angle += 0.03;
+                        p.mesh.position.x = Math.cos(p.angle) * 6;
+                        p.mesh.position.z = Math.sin(p.angle) * 4;
+                    });
+                }
+
+                this.controls.update();
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+
+        // Initialize App on Window Load
+        let app;
+        window.onload = () => {
+            app = new ElectricLabApp();
+        };
+    </script>
+</body>
+</html>
